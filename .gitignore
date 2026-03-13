@@ -1,0 +1,27 @@
+# 秘密情報
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+
+# 依存関係
+node_modules/
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# ビルド成果物
+dist/
+build/
+*.log

@@ -1,0 +1,44 @@
+{
+  "allowedTools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(git status:*)",
+    "Bash(git log:*)",
+    "Bash(git diff:*)"
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[Hook] ファイル変更を検知しました。lint/testが設定されていれば自動実行されます。'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get('command',''))\"); case \"$cmd\" in *\"rm -rf\"*|*\"git push --force\"*|*\"DROP TABLE\"*|*\"--no-verify\"*) echo \"BLOCKED: 危険なコマンドが検知されました: $cmd\" >&2; exit 2 ;; esac"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '=== Claude Code セッション開始 ===' && echo \"作業ディレクトリ: $(pwd)\" && echo \"Gitブランチ: $(git branch --show-current 2>/dev/null || echo 'N/A')\" && echo \"Git状態:\" && git status --short 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
