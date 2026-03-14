@@ -4,12 +4,26 @@ Kling AI 動画生成モジュール
 """
 import os
 import time
+import jwt
 import requests
+from datetime import datetime, timezone
 from typing import List, Dict
 
 
-KLING_API_KEY = os.environ.get("KLING_API_KEY", "")
+KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY", "")
+KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY", "")
 KLING_BASE_URL = "https://api.klingai.com/v1"
+
+
+def _generate_jwt() -> str:
+    """Access Key と Secret Key から JWT トークンを生成する"""
+    now = int(datetime.now(timezone.utc).timestamp())
+    payload = {
+        "iss": KLING_ACCESS_KEY,
+        "exp": now + 1800,  # 30分有効
+        "nbf": now - 5,
+    }
+    return jwt.encode(payload, KLING_SECRET_KEY, algorithm="HS256")
 
 
 def generate_scene_video(visual_prompt: str, duration: int = 5) -> str:
@@ -24,7 +38,7 @@ def generate_scene_video(visual_prompt: str, duration: int = 5) -> str:
         生成された動画のURL
     """
     headers = {
-        "Authorization": f"Bearer {KLING_API_KEY}",
+        "Authorization": f"Bearer {_generate_jwt()}",
         "Content-Type": "application/json",
     }
 
@@ -64,7 +78,7 @@ def _wait_for_video(task_id: str, headers: dict, max_wait: int = 300) -> str:
 
         res = requests.get(
             f"{KLING_BASE_URL}/videos/text2video/{task_id}",
-            headers=headers,
+            headers={**headers, "Authorization": f"Bearer {_generate_jwt()}"},
             timeout=30,
         )
         res.raise_for_status()
