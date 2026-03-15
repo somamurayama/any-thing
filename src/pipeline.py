@@ -10,7 +10,7 @@ from typing import List
 
 from research.news_fetcher import fetch_news, rank_articles
 from summarizer.script_generator import generate_script, generate_thumbnail_prompt
-from video.kling_client import generate_all_scenes, download_video
+from video.pexels_client import generate_all_scenes
 from publisher.youtube import upload_to_youtube
 from publisher.tiktok import upload_to_tiktok
 from publisher.instagram import upload_to_instagram
@@ -50,17 +50,11 @@ def run_pipeline():
     with open(log_path, "w", encoding="utf-8") as f:
         json.dump(script, f, ensure_ascii=False, indent=2)
 
-    # 3. 動画生成（Kling AI）
-    print("[3/4] 動画生成中（Kling AI）...")
-    scene_video_urls = generate_all_scenes(script["scenes"])
+    # 3. 動画生成（Pexels + FFmpeg）
+    print("[3/4] 動画生成中（Pexels + FFmpeg）...")
 
-    # 動画をダウンロード・結合
     with tempfile.TemporaryDirectory() as tmpdir:
-        scene_paths = []
-        for i, url in enumerate(scene_video_urls):
-            path = os.path.join(tmpdir, f"scene_{i:02d}.mp4")
-            download_video(url, path)
-            scene_paths.append(path)
+        scene_paths = generate_all_scenes(script["scenes"], tmpdir)
 
         # FFmpegでシーンを結合
         final_video_path = os.path.join(tmpdir, "final.mp4")
