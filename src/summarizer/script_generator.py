@@ -7,7 +7,8 @@ import anthropic
 from typing import List, Dict
 
 
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+def _get_client():
+    return anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
 def generate_script(articles: List[Dict]) -> Dict:
@@ -60,7 +61,7 @@ def generate_script(articles: List[Dict]) -> Dict:
 - ハッシュタグは10〜15個（日本語・英語混在OK）
 """
 
-    message = client.messages.create(
+    message = _get_client().messages.create(
         model="claude-sonnet-4-6",
         max_tokens=2000,
         messages=[{"role": "user", "content": prompt}],
@@ -95,7 +96,7 @@ Kling AI / Stable Diffusion 用プロンプトを英語で1文で作成してく
 
 プロンプトのみ返してください。
 """
-    message = client.messages.create(
+    message = _get_client().messages.create(
         model="claude-sonnet-4-6",
         max_tokens=200,
         messages=[{"role": "user", "content": prompt}],
