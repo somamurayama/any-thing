@@ -11,6 +11,12 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+    services:
+      voicevox:
+        image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+        ports:
+          - 50021:50021
+
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +30,18 @@ jobs:
 
       - name: 依存関係インストール
         run: pip install -r requirements.txt
+
+      - name: VOICEVOX Engine 起動待機
+        run: |
+          echo "VOICEVOX Engine の起動を待機中..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:50021/version > /dev/null; then
+              echo "VOICEVOX Engine 起動完了"
+              break
+            fi
+            echo "  待機中... (${i}/30)"
+            sleep 5
+          done
 
       - name: パイプライン実行
         env:
@@ -42,6 +60,9 @@ jobs:
           # Instagram
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+          # VOICEVOX
+          VOICEVOX_URL: http://localhost:50021
+          VOICEVOX_SPEAKER: ${{ vars.VOICEVOX_SPEAKER || '3' }}
           # Pexels
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           # Twitter/X

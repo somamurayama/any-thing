@@ -148,11 +148,42 @@ def add_text_overlay(input_path: str, output_path: str, text: str, font_size: in
     return output_path
 
 
+def add_audio_to_video(video_path: str, audio_path: str, output_path: str) -> str:
+    """
+    WAV 音声を動画に合成する（動画の長さを基準に音声をトリム）
+
+    Args:
+        video_path: 入力動画パス
+        audio_path: 入力音声パス（.wav）
+        output_path: 出力動画パス
+
+    Returns:
+        output_path
+    """
+    subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-i", audio_path,
+            "-c:v", "copy",
+            "-c:a", "aac", "-b:a", "128k",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            output_path,
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return output_path
+
+
 def generate_all_scenes(scenes: List[Dict], tmpdir: str) -> List[str]:
     """
     全シーンの動画を生成してローカルパスリストを返す
 
     Pexels で素材を検索し、ナレーションテキストをオーバーレイする。
+    VOICEVOX_URL が設定されている場合は音声も合成する。
 
     Args:
         scenes: スクリプトのシーンリスト
@@ -161,6 +192,9 @@ def generate_all_scenes(scenes: List[Dict], tmpdir: str) -> List[str]:
     Returns:
         各シーンの動画パスリスト
     """
+    from video.voicevox_client import synthesize as tts_synthesize
+
+    voicevox_enabled = bool(os.environ.get("VOICEVOX_URL"))
     scene_paths = []
 
     for i, scene in enumerate(scenes):
@@ -183,6 +217,19 @@ def generate_all_scenes(scenes: List[Dict], tmpdir: str) -> List[str]:
             os.remove(raw_path)
         else:
             os.rename(raw_path, final_path)
+
+        # VOICEVOX で音声合成して動画に合成
+        if narration and voicevox_enabled:
+            audio_path = os.path.join(tmpdir, f"scene_{i:02d}.wav")
+            voiced_path = os.path.join(tmpdir, f"scene_{i:02d}_voiced.mp4")
+            try:
+                tts_synthesize(narration, audio_path)
+                add_audio_to_video(final_path, audio_path, voiced_path)
+                os.replace(voiced_path, final_path)
+                os.remove(audio_path)
+                print(f"[VOICEVOX] シーン {i+1} 音声合成完了")
+            except Exception as e:
+                print(f"[VOICEVOX] シーン {i+1} 音声生成スキップ: {e}")
 
         scene_paths.append(final_path)
         print(f"[Pexels] シーン {i+1} 完了")
