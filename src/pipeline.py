@@ -28,50 +28,75 @@ ENABLED_PLATFORMS = {
 }
 
 
-def run_pipeline():
-    print(f"=== パイプライン開始: {datetime.now().isoformat()} ===")
+def generate_video(output_dir: str):
+    """
+    ニュース収集 → スクリプト生成 → 動画生成を実行し output_dir に保存する
+
+    output_dir/final.mp4  : 生成した動画
+    output_dir/script.json: スクリプト（SNS投稿用メタ情報）
+    """
+    print(f"=== 動画生成開始: {datetime.now().isoformat()} ===")
+    os.makedirs(output_dir, exist_ok=True)
 
     # 1. ニュース収集
-    print("[1/4] ニュース収集中...")
+    print("[1/3] ニュース収集中...")
     articles = fetch_news(max_hours=24, max_per_feed=5)
     top_articles = rank_articles(articles, top_n=10)
     print(f"  取得: {len(articles)}件 → 上位{len(top_articles)}件を使用")
 
     # 2. スクリプト生成
-    print("[2/4] スクリプト生成中（Claude API）...")
+    print("[2/3] スクリプト生成中（Claude API）...")
     script = generate_script(top_articles)
     print(f"  タイトル: {script['title']}")
     print(f"  シーン数: {len(script['scenes'])}")
 
-    # スクリプトをログ保存
-    log_dir = "logs"
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = f"{log_dir}/{datetime.now().strftime('%Y%m%d_%H%M%S')}_script.json"
-    with open(log_path, "w", encoding="utf-8") as f:
+    script_path = os.path.join(output_dir, "script.json")
+    with open(script_path, "w", encoding="utf-8") as f:
         json.dump(script, f, ensure_ascii=False, indent=2)
 
     # 3. 動画生成（Pexels + FFmpeg）
-    print("[3/4] 動画生成中（Pexels + FFmpeg）...")
-
+    print("[3/3] 動画生成中（Pexels + FFmpeg）...")
     with tempfile.TemporaryDirectory() as tmpdir:
         scene_paths = generate_all_scenes(script["scenes"], tmpdir)
-
-        # FFmpegでシーンを結合
-        final_video_path = os.path.join(tmpdir, "final.mp4")
+        final_video_path = os.path.join(output_dir, "final.mp4")
         _concat_videos(scene_paths, final_video_path)
 
-        # 4. SNS投稿
-        print("[4/4] SNS投稿中...")
-        results = _publish_to_all(
-            video_path=final_video_path,
-            script=script,
-        )
+    print(f"\n=== 動画生成完了 ===")
+    print(f"  動画: {final_video_path}")
+    print(f"  スクリプト: {script_path}")
+    print(f"  タイトル: {script['title']}")
+
+
+def publish_video(output_dir: str):
+    """
+    output_dir の動画をSNSに投稿する
+
+    Args:
+        output_dir: generate_video() で使用した出力ディレクトリ
+    """
+    print(f"=== SNS投稿開始: {datetime.now().isoformat()} ===")
+
+    video_path = os.path.join(output_dir, "final.mp4")
+    script_path = os.path.join(output_dir, "script.json")
+
+    with open(script_path, encoding="utf-8") as f:
+        script = json.load(f)
+
+    print(f"  タイトル: {script['title']}")
+    results = _publish_to_all(video_path=video_path, script=script)
 
     print("\n=== 投稿結果 ===")
     for platform, url in results.items():
         print(f"  {platform}: {url}")
 
     return results
+
+
+def run_pipeline():
+    """ローカル実行用: 生成から投稿まで一括実行"""
+    output_dir = "output"
+    generate_video(output_dir)
+    publish_video(output_dir)
 
 
 def _concat_videos(scene_paths: List[str], output_path: str):

@@ -6,7 +6,10 @@ on:
   workflow_dispatch:        # 手動実行も可能
 
 jobs:
-  generate-and-post:
+  # ─────────────────────────────────────────
+  # ジョブ1: 動画を生成して Artifact に保存
+  # ─────────────────────────────────────────
+  generate:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -43,13 +46,51 @@ jobs:
             sleep 5
           done
 
-      - name: パイプライン実行
+      - name: 動画生成
         env:
-          # Claude API
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Kling AI
-          KLING_ACCESS_KEY: ${{ secrets.KLING_ACCESS_KEY }}
-          KLING_SECRET_KEY: ${{ secrets.KLING_SECRET_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          VOICEVOX_URL: http://localhost:50021
+          VOICEVOX_SPEAKER: ${{ vars.VOICEVOX_SPEAKER || '3' }}
+        run: python main.py generate
+
+      - name: 動画を Artifact にアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-${{ github.run_id }}
+          path: output/
+          retention-days: 7
+
+  # ─────────────────────────────────────────
+  # ジョブ2: 承認後にSNSへ投稿
+  # （GitHub の Environment "production" で承認者を設定すること）
+  # ─────────────────────────────────────────
+  publish:
+    needs: generate
+    runs-on: ubuntu-latest
+    environment: production  # ← ここで承認待ちになる
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 依存関係インストール
+        run: pip install -r requirements.txt
+
+      - name: Artifact をダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          name: video-${{ github.run_id }}
+          path: output/
+
+      - name: SNS投稿
+        env:
           # YouTube
           YOUTUBE_ACCESS_TOKEN: ${{ secrets.YOUTUBE_ACCESS_TOKEN }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
@@ -60,11 +101,6 @@ jobs:
           # Instagram
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
-          # VOICEVOX
-          VOICEVOX_URL: http://localhost:50021
-          VOICEVOX_SPEAKER: ${{ vars.VOICEVOX_SPEAKER || '3' }}
-          # Pexels
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           # Twitter/X
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
@@ -73,4 +109,4 @@ jobs:
           # Facebook
           FACEBOOK_ACCESS_TOKEN: ${{ secrets.FACEBOOK_ACCESS_TOKEN }}
           FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
-        run: python main.py
+        run: python main.py publish
